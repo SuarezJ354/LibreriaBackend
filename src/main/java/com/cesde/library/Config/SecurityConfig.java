@@ -42,10 +42,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/libros/**", "/favoritos/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/libros/**").hasAnyRole("ADMIN", "BIBLIOTECARIO")
-                        .requestMatchers("/usuarios/login", "/usuarios/registro", "/usuarios/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/libros/**", "/uploads/**", "/usuarios/**", "/capitulos/**", "/login", "/categorias/**", "/favoritos/**", "/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/libros/**", "/favoritos/**", "/mensajes/**").authenticated()
+                        .requestMatchers("/usuarios/login", "/usuarios/registro", "/usuarios/**", "/mensajes/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/libros/**", "/uploads/**", "/usuarios/**", "/capitulos/**", "/login", "/categorias/**", "/favoritos/**", "/auth/**", "/mensajes/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

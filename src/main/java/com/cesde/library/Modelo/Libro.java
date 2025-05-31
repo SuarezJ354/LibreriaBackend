@@ -46,7 +46,6 @@ public class Libro {
     @Column(name = "total_capitulos")
     private Integer totalCapitulos;
 
-    // Archivos
     @Column(name = "archivo_pdf")
     private String archivoPdf; // Ruta del PDF completo
 
