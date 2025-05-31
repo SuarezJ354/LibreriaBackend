@@ -5,6 +5,7 @@ import com.cesde.library.Security.JwtAuthenticationFilter;
 import com.cesde.library.Utils.JwtUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -27,6 +28,9 @@ public class SecurityConfig {
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtUtils jwtUtils;
 
+    @Value("${cors.allowed-origins:http://localhost:2007,https://proyecto-libreria.netlify.app}")
+    private String allowedOrigins;
+
     public SecurityConfig(CustomUserDetailsService customUserDetailsService, JwtUtils jwtUtils) {
         this.customUserDetailsService = customUserDetailsService;
         this.jwtUtils = jwtUtils;
@@ -44,7 +48,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/libros/**", "/uploads/**", "/usuarios/**", "/capitulos/**", "/login", "/categorias/**", "/favoritos/**", "/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
-
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
@@ -68,12 +71,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:2007",
-                "https://proyecto-libreria.netlify.app",
-                "https://tu-backend.railway.app"
-        ));
-
+        // Convertir la cadena de orígenes separados por coma en lista
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
