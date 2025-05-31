@@ -1,29 +1,30 @@
-FROM maven:3.9.4-eclipse-temurin-17 AS build
+# Dockerfile optimizado para Railway
+FROM eclipse-temurin:17-jdk-jammy
 
 WORKDIR /app
 
-# Copiar pom.xml primero para aprovechar cache de Docker
+# Instalar Maven
+RUN apt-get update && \
+    apt-get install -y maven && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copiar archivos de configuración Maven primero
 COPY pom.xml .
 
-# Descargar dependencias (se cachea si pom.xml no cambia)
-RUN mvn dependency:go-offline -B
+# Resolver dependencias (aprovecha cache de Docker)
+RUN mvn dependency:resolve
 
 # Copiar código fuente
 COPY src ./src
 
-# Compilar aplicación
-RUN mvn clean package -DskipTests
+# Compilar con más memoria y sin tests
+RUN MAVEN_OPTS="-Xmx1024m" mvn clean package -DskipTests -q
 
-# Etapa final - runtime
-FROM eclipse-temurin:17-jre-jammy
-
-WORKDIR /app
-
-# Copiar JAR compilado desde etapa anterior
-COPY --from=build /app/target/*.jar app.jar
+# Verificar que el JAR existe
+RUN ls -la target/
 
 # Exponer puerto
 EXPOSE 8080
 
 # Ejecutar aplicación
-ENTRYPOINT ["java", "-jar", "app.jar"]
+CMD ["sh", "-c", "java -Xmx512m -jar target/*.jar"]
