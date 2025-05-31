@@ -23,7 +23,9 @@ public class Capitulo {
 
     private String titulo;
 
-    @Column(columnDefinition = "LONGTEXT")
+    // 🔧 CAMBIO PRINCIPAL: Reemplazar LONGTEXT por TEXT para PostgreSQL
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String contenido; // Contenido HTML/texto del capítulo
 
     @Column(name = "es_gratuito")
