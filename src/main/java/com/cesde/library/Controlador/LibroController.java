@@ -31,8 +31,9 @@ public class LibroController {
     @Autowired
     private CategoriaRepository categoriaRepository;
 
-    // 🔧 CORREGIDO: Usar ruta absoluta
-    private final String PDF_DIR = System.getProperty("user.home") + "/library-uploads/pdf/";
+    private final String PDF_DIR = System.getenv("UPLOAD_DIR") != null
+            ? System.getenv("UPLOAD_DIR")
+            : "/tmp/library-uploads/pdf/";
 
     // 📌 Registrar un nuevo libro con archivo y JSON
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
