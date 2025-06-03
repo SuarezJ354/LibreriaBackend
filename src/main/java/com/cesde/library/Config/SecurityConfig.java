@@ -44,8 +44,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.DELETE, "/libros/**").hasAnyRole("ADMIN", "BIBLIOTECARIO")
                         .requestMatchers(HttpMethod.POST, "/libros/**", "/favoritos/**", "/mensajes/**").authenticated()
-                        .requestMatchers("/usuarios/login", "/usuarios/registro", "/usuarios/**", "/mensajes/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/libros/**", "/uploads/**", "/usuarios/**", "/capitulos/**", "/login", "/categorias/**", "/favoritos/**", "/auth/**", "/mensajes/**", "/notificacione/**").permitAll()
+                        .requestMatchers("/usuarios/login", "/usuarios/registro", "/usuarios/**", "/mensajes/**", "/notificaciones/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/libros/**", "/uploads/**", "/usuarios/**", "/capitulos/**", "/login", "/categorias/**", "/favoritos/**", "/auth/**", "/mensajes/**", "/notificaciones/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
