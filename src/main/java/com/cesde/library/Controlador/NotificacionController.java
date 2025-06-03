@@ -1,10 +1,14 @@
 package com.cesde.library.Controlador;
 
+import com.cesde.library.Modelo.Mensajes;
 import com.cesde.library.Modelo.Notificaciones;
 import com.cesde.library.Servicios.NotificacionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDateTime;
+import java.util.Map;
+import com.cesde.library.Servicios.MensajeService;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +17,8 @@ import java.util.Optional;
 @RequestMapping("/notificaciones")
 @CrossOrigin(origins = {"http://localhost:2007"})
 public class NotificacionController {
+    @Autowired
+    private MensajeService mensajeService;
 
     @Autowired
     private NotificacionService notificacionService;
@@ -150,6 +156,43 @@ public class NotificacionController {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
+        }
+    }
+    // Agregar este método a tu NotificacionController.java
+
+    @PostMapping("/{id}/respuesta")
+    public ResponseEntity<String> responderNotificacion(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        try {
+            String mensaje = request.get("mensaje");
+            if (mensaje == null || mensaje.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("El mensaje es obligatorio");
+            }
+
+            // Primero obtenemos la notificación
+            Optional<Notificaciones> notificacionOpt = notificacionService.obtenerNotificacionPorId(id);
+            if (!notificacionOpt.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Notificaciones notificacion = notificacionOpt.get();
+
+            // Creamos un nuevo mensaje como respuesta
+            Mensajes respuesta = new Mensajes();
+            respuesta.setContenido(mensaje.trim());
+            respuesta.setAutor("Administrador"); // O el usuario que está respondiendo
+            respuesta.setEsRespuesta(true);
+            respuesta.setMensajePadreId(notificacion.getMensajeId()); // Usando mensajePadreId
+            respuesta.setFecha(LocalDateTime.now()); // Usando LocalDateTime
+
+            // Guardamos la respuesta usando el servicio de mensajes
+            mensajeService.guardarMensaje(respuesta);
+
+            // Marcamos la notificación como leída
+            notificacionService.marcarNotificacionComoLeida(id);
+
+            return ResponseEntity.ok("Respuesta enviada correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error al enviar la respuesta");
         }
     }
 }
