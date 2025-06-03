@@ -4,6 +4,7 @@ import com.cesde.library.Modelo.Rol;
 import com.cesde.library.Modelo.Usuario;
 import com.cesde.library.Servicios.UsuarioService;
 import com.cesde.library.Security.JwtTokenProvider;
+import com.cesde.library.Utils.JwtUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +19,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-@CrossOrigin(origins = "http://localhost:2007")
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/usuarios")
 public class UsuarioController {
@@ -27,27 +28,13 @@ public class UsuarioController {
     private UsuarioService usuarioService;
 
     @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+    private JwtUtils jwtUtils; // ✅ Cambiar a JwtUtils
 
     @Autowired
     private AuthenticationManager authenticationManager;
 
     @Autowired
-    private PasswordEncoder passwordEncoder; // ✅ AÑADIR ESTO
-
-    @PostMapping("/registro")
-    public ResponseEntity<?> registrarUsuario(@RequestBody Usuario usuario){
-        try {
-            // ✅ Encriptar contraseña antes de guardar
-            usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
-
-            Usuario nuevoUsuario = usuarioService.guardarUsuario(usuario);
-            return ResponseEntity.ok(nuevoUsuario);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
+    private PasswordEncoder passwordEncoder;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> loginData) {
@@ -55,34 +42,35 @@ public class UsuarioController {
         String password = loginData.get("password");
 
         try {
-            // Autenticar las credenciales con el AuthenticationManager
+            // Autenticar las credenciales
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(correo, password)
             );
 
-            // Generar el token JWT (solo el token puro)
-            String token = jwtTokenProvider.generateToken(authentication);
-
-            // Obtener datos del usuario
+            // Obtener datos del usuario ANTES de generar el token
             Optional<Usuario> usuarioOpt = usuarioService.obtenerUsuarioPorCorreo(correo);
+            if (!usuarioOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Usuario no encontrado"));
+            }
+
+            Usuario usuario = usuarioOpt.get();
+
+            // ✅ Generar token con userId usando JwtUtils
+            String token = jwtUtils.generateToken(correo, usuario.getId());
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("usuario", Map.of(
-                    "id", usuarioOpt.map(Usuario::getId).orElse(0L),
-                    "nombre", usuarioOpt.map(Usuario::getNombre).orElse(""),
-                    "correo", usuarioOpt.map(Usuario::getCorreo).orElse(""),
-                    "rol", usuarioOpt.map(u -> u.getRol() != null ? u.getRol().toString() : "SIN_ROL").orElse("SIN_ROL")
+                    "id", usuario.getId(),
+                    "nombre", usuario.getNombre(),
+                    "correo", usuario.getCorreo(),
+                    "rol", usuario.getRol() != null ? usuario.getRol().toString() : "SIN_ROL"
             ));
-
-            // *** Aquí NO agregamos "Bearer ", solo el token puro ***
             response.put("token", token);
 
             return ResponseEntity.ok(response);
         } catch (AuthenticationException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("mensaje", "Credenciales inválidas");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(Map.of("success", false, "mensaje", "Credenciales inválidas"));
         }
     }
 
@@ -96,27 +84,36 @@ public class UsuarioController {
 
         String token = authHeader.substring(7);
 
-        if (!jwtTokenProvider.validateToken(token)) {
+        try {
+            // ✅ Usar JwtUtils para validar
+            if (!jwtUtils.isTokenValid(token)) {
+                return ResponseEntity.status(HttpServletResponse.SC_UNAUTHORIZED)
+                        .body(Map.of("error", "Token inválido"));
+            }
+
+            String username = jwtUtils.extractUsername(token);
+            Long userId = jwtUtils.extractUserId(token); // ✅ Ahora sí tendrá userId
+
+            Optional<Usuario> usuarioOpt = usuarioService.obtenerUsuarioPorCorreo(username);
+
+            if (usuarioOpt.isPresent()) {
+                Usuario usuario = usuarioOpt.get();
+                Map<String, Object> response = new HashMap<>();
+                response.put("usuario", Map.of(
+                        "id", usuario.getId(),
+                        "nombre", usuario.getNombre(),
+                        "correo", usuario.getCorreo(),
+                        "rol", usuario.getRol()
+                ));
+                return ResponseEntity.ok(response);
+            }
+
             return ResponseEntity.status(HttpServletResponse.SC_UNAUTHORIZED)
-                    .body(Map.of("error", "Token inválido"));
+                    .body(Map.of("error", "Usuario no encontrado"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpServletResponse.SC_UNAUTHORIZED)
+                    .body(Map.of("error", "Token inválido: " + e.getMessage()));
         }
-
-        String username = jwtTokenProvider.getUsernameFromJWT(token);
-        Optional<Usuario> usuarioOpt = usuarioService.obtenerUsuarioPorCorreo(username);
-
-        if (usuarioOpt.isPresent()) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("usuario", Map.of(
-                    "id", usuarioOpt.get().getId(),
-                    "nombre", usuarioOpt.get().getNombre(),
-                    "correo", usuarioOpt.get().getCorreo(),
-                    "rol", usuarioOpt.get().getRol()
-            ));
-            return ResponseEntity.ok(response);
-        }
-
-        return ResponseEntity.status(HttpServletResponse.SC_UNAUTHORIZED)
-                .body(Map.of("error", "Usuario no encontrado"));
     }
 
     // Otros endpoints (listar, actualizar, eliminar) se mantienen igual...
