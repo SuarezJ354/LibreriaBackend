@@ -24,7 +24,6 @@ public class Mensajes {
     @Column(name = "mensaje_padre_id")
     private Long mensajePadreId;
 
-    // Campo nuevo para asociar mensaje con usuario
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
 
@@ -37,6 +36,16 @@ public class Mensajes {
         this.usuarioId = usuarioId;
         this.fecha = LocalDateTime.now();
         this.esRespuesta = false;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.fecha == null) {
+            this.fecha = LocalDateTime.now();
+        }
+        if (this.esRespuesta == null) {
+            this.esRespuesta = false;
+        }
     }
 
     // Getters y Setters
