@@ -1,12 +1,10 @@
 package com.cesde.library.Modelo;
-
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "mensajes")
 public class Mensajes {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,12 +24,17 @@ public class Mensajes {
     @Column(name = "mensaje_padre_id")
     private Long mensajePadreId;
 
+    // Campo nuevo para asociar mensaje con usuario
+    @Column(name = "usuario_id", nullable = false)
+    private Long usuarioId;
+
     // Constructores
     public Mensajes() {}
 
-    public Mensajes(String contenido, String autor) {
+    public Mensajes(String contenido, String autor, Long usuarioId) {
         this.contenido = contenido;
         this.autor = autor;
+        this.usuarioId = usuarioId;
         this.fecha = LocalDateTime.now();
         this.esRespuesta = false;
     }
@@ -83,5 +86,13 @@ public class Mensajes {
 
     public void setMensajePadreId(Long mensajePadreId) {
         this.mensajePadreId = mensajePadreId;
+    }
+
+    public Long getUsuarioId() {
+        return usuarioId;
+    }
+
+    public void setUsuarioId(Long usuarioId) {
+        this.usuarioId = usuarioId;
     }
 }
