@@ -3,6 +3,7 @@ package com.cesde.library.Controlador;
 import com.cesde.library.Modelo.Mensajes;
 import com.cesde.library.Modelo.Notificaciones;
 import com.cesde.library.Servicios.NotificacionService;
+import com.cesde.library.Servicios.UsuarioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.Map;
 import com.cesde.library.Servicios.MensajeService;
+import org.springframework.security.core.Authentication;
+import com.cesde.library.Modelo.Usuario;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +27,9 @@ public class NotificacionController {
 
     @Autowired
     private NotificacionService notificacionService;
+
+    @Autowired
+    private UsuarioService usuarioService; // ✅ Agregar esta línea
 
     @GetMapping
     public ResponseEntity<List<Notificaciones>> listarNotificaciones() {
@@ -163,7 +169,11 @@ public class NotificacionController {
 
     @PostMapping("/{id}/respuesta")
     @PreAuthorize("hasRole('ADMIN') or hasRole('BIBLIOTECARIO')")
-    public ResponseEntity<String> responderNotificacion(@PathVariable Long id, @RequestBody Map<String, String> request) {
+    public ResponseEntity<String> responderNotificacion(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            Authentication authentication) { // ✅ Agregar Authentication
+
         System.out.println("🔵 Iniciando respuesta a notificación ID: " + id);
 
         try {
@@ -175,14 +185,25 @@ public class NotificacionController {
                 return ResponseEntity.badRequest().body("El mensaje es obligatorio");
             }
 
-            // Obtener la notificación
-            System.out.println("🔍 Buscando notificación ID: " + id);
+            // ✅ Obtener usuario por correo (que viene del JWT)
+            String correoUsuario = authentication.getName();
+            System.out.println("👤 Correo del usuario autenticado: " + correoUsuario);
+
+            Optional<Usuario> usuarioOpt = usuarioService.obtenerUsuarioPorCorreo(correoUsuario);
+            if (!usuarioOpt.isPresent()) {
+                System.out.println("❌ Usuario no encontrado con correo: " + correoUsuario);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuario no encontrado");
+            }
+
+            Usuario usuario = usuarioOpt.get();
+            System.out.println("✅ Usuario encontrado - ID: " + usuario.getId() + ", Nombre: " + usuario.getNombre());
+
+            // Resto de tu código para obtener la notificación...
             Optional<Notificaciones> notificacionOpt = notificacionService.obtenerNotificacionPorId(id);
             if (!notificacionOpt.isPresent()) {
                 System.out.println("❌ Notificación no encontrada");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Notificación no encontrada");
             }
-
 
             Notificaciones notificacion = notificacionOpt.get();
             System.out.println("✅ Notificación encontrada - MensajeID: " + notificacion.getMensajeId());
@@ -193,37 +214,28 @@ public class NotificacionController {
             }
 
             // Verificar mensaje padre
-            System.out.println("🔍 Verificando mensaje padre ID: " + notificacion.getMensajeId());
-            try {
-                Optional<Mensajes> mensajePadreOpt = mensajeService.obtenerMensajePorId(notificacion.getMensajeId());
-                if (!mensajePadreOpt.isPresent()) {
-                    System.out.println("❌ Mensaje padre no encontrado");
-                    return ResponseEntity.badRequest().body("El mensaje original no existe");
-                }
-                System.out.println("✅ Mensaje padre encontrado");
-            } catch (Exception e) {
-                System.out.println("❌ Error al buscar mensaje padre: " + e.getMessage());
-                return ResponseEntity.internalServerError().body("Error al verificar mensaje padre");
+            Optional<Mensajes> mensajePadreOpt = mensajeService.obtenerMensajePorId(notificacion.getMensajeId());
+            if (!mensajePadreOpt.isPresent()) {
+                System.out.println("❌ Mensaje padre no encontrado");
+                return ResponseEntity.badRequest().body("El mensaje original no existe");
             }
 
-            // Crear respuesta
+            // ✅ Crear respuesta CON el usuario
             System.out.println("📝 Creando mensaje de respuesta...");
             Mensajes respuesta = new Mensajes();
             respuesta.setContenido(mensaje.trim());
-            respuesta.setAutor("Administrador");
+            respuesta.setAutor(usuario.getNombre()); // Usar el nombre real del usuario
             respuesta.setEsRespuesta(true);
             respuesta.setMensajePadreId(notificacion.getMensajeId());
             respuesta.setFecha(LocalDateTime.now());
+            respuesta.setUsuarioId(usuario.getId()); // ✅ ESTO RESUELVE EL ERROR
 
             System.out.println("📋 Datos de respuesta:");
+            System.out.println("  - Usuario ID: " + usuario.getId());
+            System.out.println("  - Usuario: " + usuario.getNombre());
             System.out.println("  - Contenido: " + respuesta.getContenido());
-            System.out.println("  - Autor: " + respuesta.getAutor());
-            System.out.println("  - Es respuesta: " + respuesta.getEsRespuesta());
-            System.out.println("  - Mensaje padre ID: " + respuesta.getMensajePadreId());
-            System.out.println("  - Fecha: " + respuesta.getFecha());
 
-            // Intentar guardar
-            System.out.println("💾 Intentando guardar mensaje...");
+            // Guardar
             try {
                 Mensajes respuestaGuardada = mensajeService.guardarMensaje(respuesta);
                 System.out.println("✅ Mensaje guardado con ID: " + respuestaGuardada.getId());
@@ -234,14 +246,7 @@ public class NotificacionController {
             }
 
             // Marcar como leída
-            System.out.println("📖 Marcando notificación como leída...");
-            try {
-                boolean marcada = notificacionService.marcarNotificacionComoLeida(id);
-                System.out.println("✅ Notificación marcada: " + marcada);
-            } catch (Exception e) {
-                System.out.println("⚠️ Error al marcar como leída: " + e.getMessage());
-            }
-
+            notificacionService.marcarNotificacionComoLeida(id);
             System.out.println("🎉 Proceso completado exitosamente");
             return ResponseEntity.ok("Respuesta enviada correctamente");
 
