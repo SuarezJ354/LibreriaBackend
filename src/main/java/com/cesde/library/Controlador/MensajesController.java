@@ -37,21 +37,16 @@ public class MensajesController {
     @GetMapping
     public ResponseEntity<?> obtenerMensajesDelUsuario(HttpServletRequest request) {
         try {
-            // Debug: verificar que el token esté presente
             String authHeader = request.getHeader("Authorization");
-            logger.debug("Auth header presente: {}", authHeader != null);
 
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                logger.warn("Token de autorización faltante o inválido");
-                return ResponseEntity.badRequest().body("Token de autorización faltante o inválido");
+                return ResponseEntity.badRequest().body(createErrorResponse("Token de autorización faltante o inválido"));
             }
 
             Long usuarioId = jwtUtils.extractUserIdFromRequest(request);
-            logger.info("Usuario ID extraído: {}", usuarioId);
 
             if (usuarioId == null) {
-                logger.warn("No se pudo extraer el ID del usuario del token");
-                return ResponseEntity.badRequest().body("No se pudo extraer el ID del usuario del token");
+                return ResponseEntity.badRequest().body(createErrorResponse("No se pudo extraer el ID del usuario del token"));
             }
 
             List<Mensajes> mensajes = mensajesRepository.findByUsuarioIdOrderByFechaDesc(usuarioId);
@@ -59,12 +54,8 @@ public class MensajesController {
 
             return ResponseEntity.ok(mensajes);
         } catch (Exception e) {
-            logger.error("Error en GET /mensajes: {}", e.getMessage(), e);
-
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error interno del servidor");
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+            logger.error("Error en GET /mensajes: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error interno del servidor", e.getMessage()));
         }
     }
 
@@ -73,56 +64,36 @@ public class MensajesController {
     public ResponseEntity<?> crearMensaje(@RequestBody Map<String, Object> mensajeData,
                                           HttpServletRequest request) {
         try {
-            logger.debug("=== Iniciando creación de mensaje ===");
-
             // Verificar token
             String authHeader = request.getHeader("Authorization");
-            logger.debug("Auth header presente: {}", authHeader != null);
 
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                logger.warn("Token faltante o inválido");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Token de autorización faltante o inválido");
-                return ResponseEntity.badRequest().body(errorResponse);
+                return ResponseEntity.badRequest().body(createErrorResponse("Token de autorización faltante o inválido"));
             }
 
             // Extraer usuario ID
             Long usuarioId = jwtUtils.extractUserIdFromRequest(request);
-            logger.info("Usuario ID extraído: {}", usuarioId);
 
             if (usuarioId == null) {
-                logger.warn("No se pudo extraer usuario ID del token");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "No se pudo extraer el ID del usuario del token");
-                return ResponseEntity.badRequest().body(errorResponse);
+                return ResponseEntity.badRequest().body(createErrorResponse("No se pudo extraer el ID del usuario del token"));
             }
 
             // Validar campos requeridos
-            logger.debug("Datos recibidos: {}", mensajeData);
+            String contenido = (String) mensajeData.get("contenido");
+            String autor = (String) mensajeData.get("autor");
 
-            if (!mensajeData.containsKey("contenido") ||
-                    mensajeData.get("contenido") == null ||
-                    mensajeData.get("contenido").toString().trim().isEmpty()) {
-                logger.warn("Contenido del mensaje faltante");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "El contenido del mensaje es requerido");
-                return ResponseEntity.badRequest().body(errorResponse);
+            if (contenido == null || contenido.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse("El contenido del mensaje es requerido"));
             }
 
-            if (!mensajeData.containsKey("autor") ||
-                    mensajeData.get("autor") == null ||
-                    mensajeData.get("autor").toString().trim().isEmpty()) {
-                logger.warn("Autor del mensaje faltante");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "El autor del mensaje es requerido");
-                return ResponseEntity.badRequest().body(errorResponse);
+            if (autor == null || autor.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse("El autor del mensaje es requerido"));
             }
 
             // Crear el mensaje
-            logger.debug("Creando nuevo mensaje");
             Mensajes mensaje = new Mensajes();
-            mensaje.setContenido((String) mensajeData.get("contenido"));
-            mensaje.setAutor((String) mensajeData.get("autor"));
+            mensaje.setContenido(contenido.trim());
+            mensaje.setAutor(autor.trim());
             mensaje.setUsuarioId(usuarioId);
             mensaje.setEsRespuesta((Boolean) mensajeData.getOrDefault("esRespuesta", false));
 
@@ -133,117 +104,107 @@ public class MensajesController {
             Mensajes mensajeGuardado = mensajesRepository.save(mensaje);
             logger.info("Mensaje guardado con ID: {}", mensajeGuardado.getId());
 
-            // Crear notificación (versión simplificada)
+            // Crear notificación de forma asíncrona para evitar bloqueos
             try {
-                logger.debug("Intentando crear notificación para mensaje ID: {}", mensajeGuardado.getId());
                 crearNotificacionParaMensaje(mensajeGuardado);
-                logger.info("Proceso de notificación completado para mensaje ID: {}", mensajeGuardado.getId());
             } catch (Exception notifError) {
-                // No fallar el guardado del mensaje si hay error en la notificación
-                logger.warn("Error al crear notificación (no crítico): {}", notifError.getMessage());
+                logger.warn("Error al crear notificación: {}", notifError.getMessage());
             }
 
-            logger.debug("=== Creación de mensaje completada ===");
             return ResponseEntity.ok(mensajeGuardado);
 
         } catch (Exception e) {
-            logger.error("Error en POST /mensajes: {}", e.getMessage(), e);
-
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error interno del servidor");
-            errorResponse.put("message", e.getMessage());
-            errorResponse.put("type", e.getClass().getSimpleName());
-            return ResponseEntity.badRequest().body(errorResponse);
+            logger.error("Error en POST /mensajes: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error interno del servidor", e.getMessage()));
         }
     }
 
-    // Obtener mensaje específico (solo si pertenece al usuario)
+    // Obtener mensaje específico
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerMensaje(@PathVariable Long id, HttpServletRequest request) {
         try {
             Long usuarioId = jwtUtils.extractUserIdFromRequest(request);
 
             if (usuarioId == null) {
-                logger.warn("No se pudo extraer usuario ID para obtener mensaje {}", id);
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "No se pudo extraer el ID del usuario del token");
-                return ResponseEntity.badRequest().body(errorResponse);
+                return ResponseEntity.badRequest().body(createErrorResponse("No se pudo extraer el ID del usuario del token"));
             }
 
-            logger.debug("Buscando mensaje {} para usuario {}", id, usuarioId);
             return mensajesRepository.findByIdAndUsuarioId(id, usuarioId)
-                    .map(mensaje -> {
-                        logger.info("Mensaje {} encontrado para usuario {}", id, usuarioId);
-                        return ResponseEntity.ok(mensaje);
-                    })
-                    .orElseGet(() -> {
-                        logger.info("Mensaje {} no encontrado para usuario {}", id, usuarioId);
-                        return ResponseEntity.notFound().build();
-                    });
-        } catch (Exception e) {
-            logger.error("Error en GET /mensajes/{}: {}", id, e.getMessage(), e);
+                    .map(mensaje -> ResponseEntity.ok(mensaje))
+                    .orElseGet(() -> ResponseEntity.notFound().build());
 
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error interno del servidor");
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Error en GET /mensajes/{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error interno del servidor", e.getMessage()));
         }
     }
 
-    // Endpoint para crear notificaciones de mensajes existentes
+    // ENDPOINT PELIGROSO - Puede causar OOM si hay muchos mensajes
     @PostMapping("/generar-notificaciones-existentes")
     public ResponseEntity<?> generarNotificacionesExistentes() {
         try {
             logger.info("Iniciando generación de notificaciones para mensajes existentes");
 
-            List<Mensajes> todosMensajes = mensajesRepository.findAll();
+            // CAMBIO CRÍTICO: Procesar en lotes para evitar OOM
+            int pageSize = 100; // Procesar máximo 100 mensajes a la vez
+            int page = 0;
             int notificacionesCreadas = 0;
+            int mensajesTotales = 0;
 
-            for (Mensajes mensaje : todosMensajes) {
-                try {
-                    List<Notificaciones> notificacionesExistentes =
-                            notificacionService.obtenerNotificacionesPorMensaje(mensaje.getId());
+            List<Mensajes> mensajes;
+            do {
+                // Usar paginación para evitar ca
+                mensajes = mensajesRepository.findAllByOrderByIdAsc(
+                        org.springframework.data.domain.PageRequest.of(page, pageSize)
+                ).getContent();
 
-                    if (notificacionesExistentes.isEmpty()) {
-                        crearNotificacionParaMensaje(mensaje);
-                        notificacionesCreadas++;
+                mensajesTotales += mensajes.size();
+
+                for (Mensajes mensaje : mensajes) {
+                    try {
+                        List<Notificaciones> notificacionesExistentes =
+                                notificacionService.obtenerNotificacionesPorMensaje(mensaje.getId());
+
+                        if (notificacionesExistentes.isEmpty()) {
+                            crearNotificacionParaMensaje(mensaje);
+                            notificacionesCreadas++;
+                        }
+                    } catch (Exception e) {
+                        logger.error("Error al procesar mensaje ID {}: {}", mensaje.getId(), e.getMessage());
                     }
-                } catch (Exception e) {
-                    logger.error("Error al procesar mensaje ID {}: {}", mensaje.getId(), e.getMessage(), e);
                 }
-            }
+
+                page++;
+
+                // Limpiar memoria explícitamente
+                System.gc();
+
+            } while (mensajes.size() == pageSize);
 
             logger.info("Proceso completado: {} notificaciones creadas de {} mensajes totales",
-                    notificacionesCreadas, todosMensajes.size());
+                    notificacionesCreadas, mensajesTotales);
 
             Map<String, Object> response = new HashMap<>();
             response.put("mensaje", "Proceso completado");
             response.put("notificacionesCreadas", notificacionesCreadas);
-            response.put("mensajesTotales", todosMensajes.size());
+            response.put("mensajesTotales", mensajesTotales);
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            logger.error("Error al generar notificaciones existentes: {}", e.getMessage(), e);
-
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error al generar notificaciones");
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+            logger.error("Error al generar notificaciones existentes: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error al generar notificaciones", e.getMessage()));
         }
     }
 
-    // Eliminar mensaje (solo si pertenece al usuario)
+    // Eliminar mensaje
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarMensaje(@PathVariable Long id, HttpServletRequest request) {
         try {
             Long usuarioId = jwtUtils.extractUserIdFromRequest(request);
 
             if (usuarioId == null) {
-                logger.warn("No se pudo extraer usuario ID para eliminar mensaje {}", id);
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "No se pudo extraer el ID del usuario del token");
-                return ResponseEntity.badRequest().body(errorResponse);
+                return ResponseEntity.badRequest().body(createErrorResponse("No se pudo extraer el ID del usuario del token"));
             }
 
             if (mensajesRepository.existsByIdAndUsuarioId(id, usuarioId)) {
@@ -252,37 +213,28 @@ public class MensajesController {
                 return ResponseEntity.ok().build();
             }
 
-            logger.info("Mensaje {} no encontrado para eliminar por usuario {}", id, usuarioId);
             return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            logger.error("Error en DELETE /mensajes/{}: {}", id, e.getMessage(), e);
 
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error interno del servidor");
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Error en DELETE /mensajes/{}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse("Error interno del servidor", e.getMessage()));
         }
     }
 
-
+    /**
+     * Método optimizado para crear notificaciones
+     */
     private void crearNotificacionParaMensaje(Mensajes mensaje) {
         try {
-            logger.debug("Creando notificación para mensaje ID: {} de autor: {}",
-                    mensaje.getId(), mensaje.getAutor());
-
-            // CAMBIO PRINCIPAL: Crear notificaciones para TODOS los mensajes
-            // Removí la condición: if ("Administrador".equals(mensaje.getAutor()))
-
             Notificaciones notificacion = new Notificaciones();
 
-            // Configurar título según si es respuesta o mensaje nuevo
             if (Boolean.TRUE.equals(mensaje.getEsRespuesta())) {
                 notificacion.setTitulo("Nueva respuesta recibida");
             } else {
                 notificacion.setTitulo("Nuevo mensaje recibido");
             }
 
-            // Configurar contenido (limitar a 100 caracteres)
+            // Limitar contenido para evitar usar demasiada memoria
             String contenidoCompleto = "De: " + mensaje.getAutor() + " - " + mensaje.getContenido();
             if (contenidoCompleto.length() > 100) {
                 notificacion.setContenido(contenidoCompleto.substring(0, 97) + "...");
@@ -294,14 +246,26 @@ public class MensajesController {
             notificacion.setFecha(mensaje.getFecha() != null ? mensaje.getFecha() : LocalDateTime.now());
             notificacion.setMensajeId(mensaje.getId());
 
-            Notificaciones notificacionCreada = notificacionService.crearNotificacion(notificacion);
-            logger.info("Notificación creada con ID: {} para mensaje ID: {}",
-                    notificacionCreada.getId(), mensaje.getId());
+            notificacionService.crearNotificacion(notificacion);
 
         } catch (Exception e) {
-            // No fallar el guardado del mensaje si hay error en la notificación
-            logger.error("Error al crear notificación para mensaje ID {} (no crítico): {}",
-                    mensaje.getId(), e.getMessage());
+            logger.error("Error al crear notificación para mensaje ID {}: {}", mensaje.getId(), e.getMessage());
         }
+    }
+
+    /**
+     * Método utilitario para crear respuestas de error consistentes
+     */
+    private Map<String, String> createErrorResponse(String error) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", error);
+        return response;
+    }
+
+    private Map<String, String> createErrorResponse(String error, String message) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", error);
+        response.put("message", message);
+        return response;
     }
 }

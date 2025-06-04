@@ -2,10 +2,15 @@
 package com.cesde.library.Repositorio;
 
 import com.cesde.library.Modelo.Mensajes;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.net.ContentHandler;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,5 +41,8 @@ public interface MensajeRepository extends JpaRepository<Mensajes, Long> {
     // Contar respuestas de un usuario
     @Query("SELECT COUNT(m) FROM Mensajes m WHERE m.usuarioId = :usuarioId AND m.esRespuesta = true")
     long countRespuestasByUsuarioId(@Param("usuarioId") Long usuarioId);
+
+    @Query("SELECT m FROM Mensajes m ORDER BY m.id ASC")
+    Page<Mensajes> findAllByOrderByIdAsc(Pageable pageable);
 }
 
