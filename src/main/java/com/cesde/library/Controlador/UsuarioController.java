@@ -36,6 +36,19 @@ public class UsuarioController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @PostMapping("/registro")
+    public ResponseEntity<?> registrarUsuario(@RequestBody Usuario usuario){
+        try {
+            // ✅ Encriptar contraseña antes de guardar
+            usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
+
+            Usuario nuevoUsuario = usuarioService.guardarUsuario(usuario);
+            return ResponseEntity.ok(nuevoUsuario);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> loginData) {
         String correo = loginData.get("correo");

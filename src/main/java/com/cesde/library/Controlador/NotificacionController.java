@@ -228,7 +228,7 @@ public class NotificacionController {
             respuesta.setEsRespuesta(true);
             respuesta.setMensajePadreId(notificacion.getMensajeId());
             respuesta.setFecha(LocalDateTime.now());
-            respuesta.setUsuarioId(usuario.getId()); // ✅ ESTO RESUELVE EL ERROR
+            respuesta.setUsuarioId(usuario.getId());
 
             System.out.println("📋 Datos de respuesta:");
             System.out.println("  - Usuario ID: " + usuario.getId());
