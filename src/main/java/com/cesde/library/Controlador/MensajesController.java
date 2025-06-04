@@ -1,12 +1,15 @@
 package com.cesde.library.Controlador;
 
 import com.cesde.library.Modelo.Mensajes;
+import com.cesde.library.Modelo.Notificaciones;
 import com.cesde.library.Repositorio.MensajeRepository;
+import com.cesde.library.Servicios.NotificacionService;
 import com.cesde.library.Utils.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +21,9 @@ public class MensajesController {
 
     @Autowired
     private MensajeRepository mensajesRepository;
+
+    @Autowired
+    private NotificacionService notificacionService; // ← AGREGADO
 
     @Autowired
     private JwtUtils jwtUtils;
@@ -123,8 +129,49 @@ public class MensajesController {
             System.out.println("Guardando mensaje...");
             Mensajes mensajeGuardado = mensajesRepository.save(mensaje);
             System.out.println("Mensaje guardado con ID: " + mensajeGuardado.getId());
-            System.out.println("========================");
 
+            // ========== NUEVA FUNCIONALIDAD: CREAR NOTIFICACIÓN ==========
+            try {
+                System.out.println("Creando notificación para el mensaje...");
+
+                Notificaciones notificacion = new Notificaciones();
+
+                // Configurar título según si es respuesta o mensaje nuevo
+                if (mensajeGuardado.getEsRespuesta() != null && mensajeGuardado.getEsRespuesta()) {
+                    notificacion.setTitulo("Nueva respuesta recibida");
+                } else {
+                    notificacion.setTitulo("Nuevo mensaje recibido");
+                }
+
+                // Configurar contenido (limitar a 100 caracteres para no hacer muy largo)
+                String contenidoCompleto = "De: " + mensajeGuardado.getAutor() + " - " + mensajeGuardado.getContenido();
+                if (contenidoCompleto.length() > 100) {
+                    notificacion.setContenido(contenidoCompleto.substring(0, 97) + "...");
+                } else {
+                    notificacion.setContenido(contenidoCompleto);
+                }
+
+                notificacion.setLeida(false);
+                notificacion.setFecha(mensajeGuardado.getFecha() != null ? mensajeGuardado.getFecha() : LocalDateTime.now());
+                notificacion.setMensajeId(mensajeGuardado.getId());
+
+                // Solo crear notificación si el mensaje NO es una respuesta del administrador
+                // (para evitar notificaciones de las propias respuestas del admin)
+                if (!"Administrador".equals(mensajeGuardado.getAutor())) {
+                    Notificaciones notificacionCreada = notificacionService.crearNotificacion(notificacion);
+                    System.out.println("Notificación creada con ID: " + notificacionCreada.getId());
+                } else {
+                    System.out.println("No se creó notificación (mensaje del administrador)");
+                }
+
+            } catch (Exception e) {
+                // No fallar el guardado del mensaje si hay error en la notificación
+                System.err.println("ERROR al crear notificación (no crítico): " + e.getMessage());
+                e.printStackTrace();
+            }
+            // ========== FIN NUEVA FUNCIONALIDAD ==========
+
+            System.out.println("========================");
             return ResponseEntity.ok(mensajeGuardado);
 
         } catch (Exception e) {
@@ -160,6 +207,65 @@ public class MensajesController {
 
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Error interno del servidor");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    // NUEVO: Endpoint para crear notificaciones de mensajes existentes
+    @PostMapping("/generar-notificaciones-existentes")
+    public ResponseEntity<?> generarNotificacionesExistentes() {
+        try {
+            // Obtener todos los mensajes que no son respuestas del administrador
+            List<Mensajes> todosMensajes = mensajesRepository.findAll();
+            int notificacionesCreadas = 0;
+
+            for (Mensajes mensaje : todosMensajes) {
+                // Verificar si ya existe una notificación para este mensaje
+                try {
+                    List<Notificaciones> notificacionesExistentes = notificacionService.obtenerNotificacionesPorMensaje(mensaje.getId());
+
+                    if (notificacionesExistentes.isEmpty() && !"Administrador".equals(mensaje.getAutor())) {
+                        Notificaciones notificacion = new Notificaciones();
+
+                        if (mensaje.getEsRespuesta() != null && mensaje.getEsRespuesta()) {
+                            notificacion.setTitulo("Respuesta pendiente");
+                        } else {
+                            notificacion.setTitulo("Mensaje pendiente");
+                        }
+
+                        String contenidoCompleto = "De: " + mensaje.getAutor() + " - " + mensaje.getContenido();
+                        if (contenidoCompleto.length() > 100) {
+                            notificacion.setContenido(contenidoCompleto.substring(0, 97) + "...");
+                        } else {
+                            notificacion.setContenido(contenidoCompleto);
+                        }
+
+                        notificacion.setLeida(false);
+                        notificacion.setFecha(mensaje.getFecha() != null ? mensaje.getFecha() : LocalDateTime.now());
+                        notificacion.setMensajeId(mensaje.getId());
+
+                        notificacionService.crearNotificacion(notificacion);
+                        notificacionesCreadas++;
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error al procesar mensaje ID " + mensaje.getId() + ": " + e.getMessage());
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("mensaje", "Proceso completado");
+            response.put("notificacionesCreadas", notificacionesCreadas);
+            response.put("mensajesTotales", todosMensajes.size());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error al generar notificaciones existentes: " + e.getMessage());
+            e.printStackTrace();
+
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Error al generar notificaciones");
             errorResponse.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
         }
