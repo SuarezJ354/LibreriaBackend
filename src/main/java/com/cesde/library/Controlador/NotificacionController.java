@@ -4,6 +4,7 @@ import com.cesde.library.Modelo.Mensajes;
 import com.cesde.library.Modelo.Notificaciones;
 import com.cesde.library.Servicios.NotificacionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
@@ -177,8 +178,9 @@ public class NotificacionController {
             Optional<Notificaciones> notificacionOpt = notificacionService.obtenerNotificacionPorId(id);
             if (!notificacionOpt.isPresent()) {
                 System.out.println("❌ Notificación no encontrada");
-                return ResponseEntity.notFound().body("Notificación no encontrada");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Notificación no encontrada");
             }
+
 
             Notificaciones notificacion = notificacionOpt.get();
             System.out.println("✅ Notificación encontrada - MensajeID: " + notificacion.getMensajeId());
