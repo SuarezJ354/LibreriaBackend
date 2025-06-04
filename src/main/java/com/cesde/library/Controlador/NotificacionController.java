@@ -6,6 +6,7 @@ import com.cesde.library.Servicios.NotificacionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -161,6 +162,7 @@ public class NotificacionController {
     }
 
     @PostMapping("/{id}/respuesta")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('BIBLIOTECARIO')")
     public ResponseEntity<String> responderNotificacion(@PathVariable Long id, @RequestBody Map<String, String> request) {
         System.out.println("🔵 Iniciando respuesta a notificación ID: " + id);
 
