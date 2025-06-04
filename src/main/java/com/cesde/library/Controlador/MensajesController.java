@@ -224,14 +224,19 @@ public class MensajesController {
     /**
      * Método optimizado para crear notificaciones
      */
+    /**
+     * Método optimizado para crear notificaciones
+     */
     private void crearNotificacionParaMensaje(Mensajes mensaje) {
         try {
             Notificaciones notificacion = new Notificaciones();
 
             if (Boolean.TRUE.equals(mensaje.getEsRespuesta())) {
                 notificacion.setTitulo("Nueva respuesta recibida");
+                notificacion.setTipo("RESPUESTA"); // Agregar tipo para respuestas
             } else {
                 notificacion.setTitulo("Nuevo mensaje recibido");
+                notificacion.setTipo("MENSAJE"); // Agregar tipo para mensajes
             }
 
             // Limitar contenido para evitar usar demasiada memoria
@@ -246,7 +251,12 @@ public class MensajesController {
             notificacion.setFecha(mensaje.getFecha() != null ? mensaje.getFecha() : LocalDateTime.now());
             notificacion.setMensajeId(mensaje.getId());
 
+            // Si necesitas establecer un usuarioId para las notificaciones
+            // notificacion.setUsuarioId(mensaje.getUsuarioId());
+
             notificacionService.crearNotificacion(notificacion);
+
+            logger.info("Notificación creada exitosamente para mensaje ID: {}", mensaje.getId());
 
         } catch (Exception e) {
             logger.error("Error al crear notificación para mensaje ID {}: {}", mensaje.getId(), e.getMessage());
