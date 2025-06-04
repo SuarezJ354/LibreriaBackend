@@ -15,7 +15,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/notificaciones")
-@CrossOrigin(origins = {"http://localhost:2007"})
+@CrossOrigin(origins = "*") //
 public class NotificacionController {
     @Autowired
     private MensajeService mensajeService;
@@ -158,7 +158,6 @@ public class NotificacionController {
             return ResponseEntity.internalServerError().build();
         }
     }
-    // Agregar este método a tu NotificacionController.java
 
     @PostMapping("/{id}/respuesta")
     public ResponseEntity<String> responderNotificacion(@PathVariable Long id, @RequestBody Map<String, String> request) {
