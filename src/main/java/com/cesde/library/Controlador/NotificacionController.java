@@ -161,37 +161,90 @@ public class NotificacionController {
 
     @PostMapping("/{id}/respuesta")
     public ResponseEntity<String> responderNotificacion(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        System.out.println("🔵 Iniciando respuesta a notificación ID: " + id);
+
         try {
             String mensaje = request.get("mensaje");
+            System.out.println("📝 Mensaje recibido: " + mensaje);
+
             if (mensaje == null || mensaje.trim().isEmpty()) {
+                System.out.println("❌ Mensaje vacío");
                 return ResponseEntity.badRequest().body("El mensaje es obligatorio");
             }
 
-            // Primero obtenemos la notificación
+            // Obtener la notificación
+            System.out.println("🔍 Buscando notificación ID: " + id);
             Optional<Notificaciones> notificacionOpt = notificacionService.obtenerNotificacionPorId(id);
             if (!notificacionOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                System.out.println("❌ Notificación no encontrada");
+                return ResponseEntity.notFound().body("Notificación no encontrada");
             }
 
             Notificaciones notificacion = notificacionOpt.get();
+            System.out.println("✅ Notificación encontrada - MensajeID: " + notificacion.getMensajeId());
 
-            // Creamos un nuevo mensaje como respuesta
+            if (notificacion.getMensajeId() == null) {
+                System.out.println("❌ La notificación no tiene mensajeId");
+                return ResponseEntity.badRequest().body("La notificación no tiene un mensaje asociado");
+            }
+
+            // Verificar mensaje padre
+            System.out.println("🔍 Verificando mensaje padre ID: " + notificacion.getMensajeId());
+            try {
+                Optional<Mensajes> mensajePadreOpt = mensajeService.obtenerMensajePorId(notificacion.getMensajeId());
+                if (!mensajePadreOpt.isPresent()) {
+                    System.out.println("❌ Mensaje padre no encontrado");
+                    return ResponseEntity.badRequest().body("El mensaje original no existe");
+                }
+                System.out.println("✅ Mensaje padre encontrado");
+            } catch (Exception e) {
+                System.out.println("❌ Error al buscar mensaje padre: " + e.getMessage());
+                return ResponseEntity.internalServerError().body("Error al verificar mensaje padre");
+            }
+
+            // Crear respuesta
+            System.out.println("📝 Creando mensaje de respuesta...");
             Mensajes respuesta = new Mensajes();
             respuesta.setContenido(mensaje.trim());
-            respuesta.setAutor("Administrador"); // O el usuario que está respondiendo
+            respuesta.setAutor("Administrador");
             respuesta.setEsRespuesta(true);
-            respuesta.setMensajePadreId(notificacion.getMensajeId()); // Usando mensajePadreId
-            respuesta.setFecha(LocalDateTime.now()); // Usando LocalDateTime
+            respuesta.setMensajePadreId(notificacion.getMensajeId());
+            respuesta.setFecha(LocalDateTime.now());
 
-            // Guardamos la respuesta usando el servicio de mensajes
-            mensajeService.guardarMensaje(respuesta);
+            System.out.println("📋 Datos de respuesta:");
+            System.out.println("  - Contenido: " + respuesta.getContenido());
+            System.out.println("  - Autor: " + respuesta.getAutor());
+            System.out.println("  - Es respuesta: " + respuesta.getEsRespuesta());
+            System.out.println("  - Mensaje padre ID: " + respuesta.getMensajePadreId());
+            System.out.println("  - Fecha: " + respuesta.getFecha());
 
-            // Marcamos la notificación como leída
-            notificacionService.marcarNotificacionComoLeida(id);
+            // Intentar guardar
+            System.out.println("💾 Intentando guardar mensaje...");
+            try {
+                Mensajes respuestaGuardada = mensajeService.guardarMensaje(respuesta);
+                System.out.println("✅ Mensaje guardado con ID: " + respuestaGuardada.getId());
+            } catch (Exception e) {
+                System.out.println("❌ Error al guardar mensaje: " + e.getMessage());
+                e.printStackTrace();
+                return ResponseEntity.internalServerError().body("Error al guardar respuesta: " + e.getMessage());
+            }
 
+            // Marcar como leída
+            System.out.println("📖 Marcando notificación como leída...");
+            try {
+                boolean marcada = notificacionService.marcarNotificacionComoLeida(id);
+                System.out.println("✅ Notificación marcada: " + marcada);
+            } catch (Exception e) {
+                System.out.println("⚠️ Error al marcar como leída: " + e.getMessage());
+            }
+
+            System.out.println("🎉 Proceso completado exitosamente");
             return ResponseEntity.ok("Respuesta enviada correctamente");
+
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error al enviar la respuesta");
+            System.out.println("💥 Error general: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error interno: " + e.getMessage());
         }
     }
 }
