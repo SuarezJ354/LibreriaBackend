@@ -1,22 +1,24 @@
-FROM eclipse-temurin:17-jdk-jammy
+# Etapa de compilación
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install -y maven && \
-    rm -rf /var/lib/apt/lists/*
-
 COPY pom.xml .
+RUN mvn dependency:go-offline
 
-ENV MAVEN_OPTS="-Xmx1024m"
-RUN mvn dependency:resolve
-
-COPY src/ ./src/
-
+COPY src ./src
 RUN mvn clean package -DskipTests -q
 
-RUN ls -la target/
+# Etapa final (ejecución liviana)
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+# Limita el uso de RAM con Java flags livianos
+ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
+
+COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "java -Xmx512m -jar target/*.jar"]
+CMD ["java", "-jar", "app.jar"]
