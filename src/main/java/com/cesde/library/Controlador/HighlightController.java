@@ -145,8 +145,6 @@ public class HighlightController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
-    // Método auxiliar para extraer el ID del usuario del token JWT
     private Long getUserIdFromRequest(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
