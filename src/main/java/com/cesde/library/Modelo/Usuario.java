@@ -1,5 +1,6 @@
 package com.cesde.library.Modelo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,5 +32,6 @@ public class Usuario {
             joinColumns = @JoinColumn(name = "usuario_id"),
             inverseJoinColumns = @JoinColumn(name = "libro_id")
     )
+    @JsonIgnore
     private Set<Libro> librosFavoritos = new HashSet<>();
 }
