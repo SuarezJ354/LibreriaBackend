@@ -116,8 +116,23 @@ public class LibroController {
     }
     // Obtener todos los libros
     @GetMapping
-    public List<Libro> listarLibros() {
-        return libroService.listarLibros();
+    public ResponseEntity<?> listarLibros() {
+        try {
+            System.out.println("🔍 Iniciando GET /libros");
+
+            List<Libro> libros = libroService.listarLibros();
+
+            System.out.println("✅ Libros obtenidos: " + (libros != null ? libros.size() : 0));
+
+            return ResponseEntity.ok(libros);
+
+        } catch (Exception e) {
+            System.err.println("❌ ERROR en GET /libros: " + e.getMessage());
+            e.printStackTrace();
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al obtener libros: " + e.getMessage());
+        }
     }
 
     // Obtener libro por ID
