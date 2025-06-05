@@ -62,7 +62,7 @@ public class Libro {
 
     // Relación con capítulos
     @OneToMany(mappedBy = "libro", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference
+    @JsonIgnore
     private List<Capitulo> capitulos;
 
     // Enum para estados
