@@ -1,5 +1,6 @@
 package com.cesde.library.Modelo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -50,12 +51,13 @@ public class Highlight {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Relaciones opcionales si tienes las entidades
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", insertable = false, updatable = false)
+    @JsonIgnore
     private Usuario usuario;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "capitulo_id", insertable = false, updatable = false)
+    @JsonIgnore
     private Capitulo capitulo;
 }
