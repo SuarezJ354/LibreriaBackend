@@ -21,7 +21,7 @@ RUN apk add --no-cache python3 py3-pip py3-setuptools postgresql-dev gcc musl-de
 RUN ln -sf python3 /usr/bin/python
 
 # Instalar psycopg2 para PostgreSQL (necesita compilación en Alpine)
-RUN pip3 install --no-cache-dir psycopg2-binary
+RUN pip3 install --no-cache-dir psycopg2==2.9.5
 
 # Crear directorio para scripts si no existe
 RUN mkdir -p /app/scripts
