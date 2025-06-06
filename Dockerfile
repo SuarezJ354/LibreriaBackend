@@ -14,6 +14,15 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
+# Instalar Python en Alpine
+RUN apk add --no-cache python3 py3-pip
+
+# Crear enlace simbólico si es necesario
+RUN ln -sf python3 /usr/bin/python
+
+# Si tu script Python tiene dependencias, instálalas aquí
+# RUN pip3 install pandas mysql-connector-python
+
 # Limita el uso de RAM con Java flags livianos
 ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
 
