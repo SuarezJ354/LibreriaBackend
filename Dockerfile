@@ -9,22 +9,21 @@ RUN mvn dependency:go-offline
 COPY src ./src
 RUN mvn clean package -DskipTests -q
 
-# Etapa final (ejecución liviana)
-FROM eclipse-temurin:17-jre-alpine
+# Etapa final con Ubuntu (más fácil para PostgreSQL)
+FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
-# Instalar Python y dependencias para PostgreSQL en Alpine
-RUN apk add --no-cache python3 py3-pip py3-setuptools postgresql-dev gcc musl-dev python3-dev
+# Instalar Python y PostgreSQL client
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
 
-# Crear enlace simbólico si es necesario
-RUN ln -sf python3 /usr/bin/python
+# Crear enlace simbólico
+RUN ln -s /usr/bin/python3 /usr/bin/python
 
-# Instalar psycopg2 para PostgreSQL (necesita compilación en Alpine)
-RUN pip3 install --no-cache-dir psycopg2==2.9.5
-
-# Crear directorio para scripts si no existe
-RUN mkdir -p /app/scripts
+# Instalar psycopg2 (más fácil en Ubuntu)
+RUN pip3 install psycopg2-binary
 
 # Limita el uso de RAM con Java flags livianos
 ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
