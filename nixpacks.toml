@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ['python3', 'python3Packages.pip', 'python3Packages.pandas']
+
+# Si tu script Python necesita otras librerías, agrégalas aquí:
+# nixPkgs = ['python3', 'python3Packages.pip', 'python3Packages.pandas', 'python3Packages.numpy', 'python3Packages.openpyxl']
