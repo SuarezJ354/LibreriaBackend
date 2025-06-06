@@ -1,3 +1,4 @@
+# Etapa de compilación
 FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
@@ -13,14 +14,14 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
-# Instalar Python y dependencias comunes en Alpine
-RUN apk add --no-cache python3 py3-pip py3-setuptools
+# Instalar Python y dependencias para PostgreSQL en Alpine
+RUN apk add --no-cache python3 py3-pip py3-setuptools postgresql-dev gcc musl-dev python3-dev
 
 # Crear enlace simbólico si es necesario
 RUN ln -sf python3 /usr/bin/python
 
-# Instalar dependencias Python más comunes para bases de datos
-RUN pip3 install --no-cache-dir mysql-connector-python pymysql pandas numpy
+# Instalar psycopg2 para PostgreSQL (necesita compilación en Alpine)
+RUN pip3 install --no-cache-dir psycopg2-binary
 
 # Crear directorio para scripts si no existe
 RUN mkdir -p /app/scripts
