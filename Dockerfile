@@ -1,4 +1,4 @@
-# Etapa de compilación
+# Etapa de compilación con Maven (Alpine)
 FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
@@ -9,31 +9,38 @@ RUN mvn dependency:go-offline
 COPY src ./src
 RUN mvn clean package -DskipTests -q
 
-# Etapa final con Ubuntu (más fácil para PostgreSQL)
-FROM eclipse-temurin:17-jre-jammy
+# Etapa final con Java + Python + PostgreSQL (Alpine)
+FROM eclipse-temurin:17-alpine
 
 WORKDIR /app
 
-# Instalar Python y PostgreSQL client
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip postgresql-client && \
-    rm -rf /var/lib/apt/lists/*
+# Instalar Python, pip, y dependencias para psycopg2
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    postgresql-libs \
+    postgresql-dev \
+    gcc \
+    musl-dev \
+    python3-dev \
+    libffi-dev \
+    openssl-dev \
+    && pip3 install --no-cache-dir psycopg2-binary \
+    && apk del gcc musl-dev python3-dev libffi-dev openssl-dev postgresql-dev
 
-# Crear enlace simbólico
-RUN apk add --no-cache libpq
-
-# Instalar psycopg2-binary
-RUN pip3 install --no-cache-dir psycopg2-binary
-
-# Configuración de memoria más estable y debugging
-ENV JAVA_TOOL_OPTIONS="-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof"
-
+# Copiar JAR de compilación
 COPY --from=build /app/target/*.jar app.jar
 
-EXPOSE 8080
+# Copiar scripts Python
+COPY src/main/resources/scripts ./scripts
 
-# Healthcheck para detectar si la app está funcionando
+# Healthcheck opcional
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+# Configuración JVM optimizada
+ENV JAVA_TOOL_OPTIONS="-Xmx384m -Xms128m -XX:+UseG1GC"
+
+EXPOSE 8080
 
 CMD ["java", "-jar", "app.jar"]
