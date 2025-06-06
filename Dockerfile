@@ -1,18 +1,23 @@
-# Imagen base solo para ejecutar el JAR y los scripts
-FROM python:3.11-slim AS runtime
+# Etapa de compilación
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-# Instala solo lo mínimo para psycopg2-binary
-RUN apt-get update && \
-    apt-get install -y gcc libpq-dev && \
-    pip install --no-cache-dir psycopg2-binary
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Copia el JAR ya compilado desde tu máquina
-COPY target/*.jar app.jar
+COPY src ./src
+RUN mvn clean package -DskipTests -q
 
-# Copia los scripts
-COPY src/main/resources/scripts ./scripts
+# Etapa final (ejecución liviana)
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+# Limita el uso de RAM con Java flags livianos
+ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
+
+COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
 
