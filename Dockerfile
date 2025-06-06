@@ -1,30 +1,18 @@
-# Etapa de compilación
-FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
-
-WORKDIR /app
-COPY pom.xml .
-RUN mvn dependency:go-offline
-COPY src ./src
-RUN mvn clean package -DskipTests -q
-
-# Etapa final (ejecución liviana)
-FROM eclipse-temurin:17-jre-alpine
+# Imagen base solo para ejecutar el JAR y los scripts
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Instala Python para permitir exportaciones CSV
-RUN apk update && apk add --no-cache python3 py3-pip
+# Instala solo lo mínimo para psycopg2-binary
+RUN apt-get update && \
+    apt-get install -y gcc libpq-dev && \
+    pip install --no-cache-dir psycopg2-binary
 
-# Opcional: agrega librerías si las usa tu script (psycopg2, pandas, etc.)
-RUN pip3 install --no-cache-dir psycopg2-binary
+# Copia el JAR ya compilado desde tu máquina
+COPY target/*.jar app.jar
 
-# Copia el jar y scripts Python
-COPY --from=build /app/target/*.jar app.jar
+# Copia los scripts
 COPY src/main/resources/scripts ./scripts
-RUN chmod +x ./scripts/*.py
-
-# Limita el uso de RAM con flags eficientes
-ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
 
 EXPOSE 8080
 
