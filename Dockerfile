@@ -14,14 +14,17 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
-# Instalar Python en Alpine
-RUN apk add --no-cache python3 py3-pip
+# Instalar Python y dependencias para PostgreSQL en Alpine
+RUN apk add --no-cache python3 py3-pip py3-setuptools postgresql-dev gcc musl-dev python3-dev
 
 # Crear enlace simbólico si es necesario
 RUN ln -sf python3 /usr/bin/python
 
-# Si tu script Python tiene dependencias, instálalas aquí
-# RUN pip3 install pandas mysql-connector-python
+# Instalar psycopg2 para PostgreSQL (necesita compilación en Alpine)
+RUN pip3 install --no-cache-dir psycopg2-binary
+
+# Crear directorio para scripts si no existe
+RUN mkdir -p /app/scripts
 
 # Limita el uso de RAM con Java flags livianos
 ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
