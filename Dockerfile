@@ -1,4 +1,3 @@
-# Etapa de compilación
 FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
@@ -7,13 +6,11 @@ RUN mvn dependency:go-offline
 COPY src ./src
 RUN mvn clean package -DskipTests -q
 
-# Etapa final: Java + Python + PostgreSQL en base Alpine real
 FROM bellsoft/liberica-openjdk-alpine:17
 
 WORKDIR /app
 
-# Instalar Python, pip y psycopg2
-RUN apk add --no-cache \
+RUN apk update && apk add --no-cache \
     python3 \
     py3-pip \
     postgresql-libs \
@@ -22,17 +19,19 @@ RUN apk add --no-cache \
     musl-dev \
     python3-dev \
     libffi-dev \
-    openssl-dev \
-    && pip3 install --no-cache-dir psycopg2-binary \
-    && apk del gcc musl-dev python3-dev libffi-dev openssl-dev postgresql-dev
+    openssl-dev
 
-# Copiar JAR y scripts
+RUN pip3 install --upgrade pip \
+    && pip3 install --no-cache-dir psycopg2-binary \
+    && apk del gcc musl-dev python3-dev libffi-dev openssl-dev postgresql-dev \
+    && rm -rf /var/cache/apk/*
+
 COPY --from=build /app/target/*.jar app.jar
 COPY src/main/resources/scripts ./scripts
 
-# JVM config
 ENV JAVA_TOOL_OPTIONS="-Xmx384m -Xms128m -XX:+UseG1GC"
 
 EXPOSE 8080
 
 CMD ["java", "-jar", "app.jar"]
+
