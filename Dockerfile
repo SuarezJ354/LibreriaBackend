@@ -9,28 +9,31 @@ RUN mvn dependency:go-offline
 COPY src ./src
 RUN mvn clean package -DskipTests -q
 
-# Etapa final (ejecución liviana)
-FROM eclipse-temurin:17-jre-alpine
+# Etapa final con Ubuntu (más fácil para PostgreSQL)
+FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
-# Instalar Python y dependencias para PostgreSQL en Alpine
-RUN apk add --no-cache python3 py3-pip py3-setuptools postgresql-dev gcc musl-dev python3-dev
+# Instalar Python y PostgreSQL client
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
 
-# Crear enlace simbólico si es necesario
-RUN ln -sf python3 /usr/bin/python
+# Crear enlace simbólico
+RUN apk add --no-cache libpq
 
-# Instalar psycopg2 para PostgreSQL (necesita compilación en Alpine)
+# Instalar psycopg2-binary
 RUN pip3 install --no-cache-dir psycopg2-binary
 
-# Crear directorio para scripts si no existe
-RUN mkdir -p /app/scripts
-
-# Limita el uso de RAM con Java flags livianos
-ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
+# Configuración de memoria más estable y debugging
+ENV JAVA_TOOL_OPTIONS="-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof"
 
 COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
+
+# Healthcheck para detectar si la app está funcionando
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 CMD ["java", "-jar", "app.jar"]
