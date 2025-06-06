@@ -1,29 +1,23 @@
-FROM bellsoft/liberica-openjdk-alpine:17
+# Etapa de compilación
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-RUN apk update && apk add --no-cache \
-    python3 \
-    py3-pip \
-    postgresql-libs \
-    postgresql-dev \
-    gcc \
-    musl-dev \
-    python3-dev \
-    libffi-dev \
-    openssl-dev
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-RUN pip3 install --upgrade pip
-RUN pip3 install --no-cache-dir psycopg2-binary
+COPY src ./src
+RUN mvn clean package -DskipTests -q
 
-RUN apk del gcc musl-dev python3-dev libffi-dev openssl-dev postgresql-dev
+# Etapa final (ejecución liviana)
+FROM eclipse-temurin:17-jre-alpine
 
-RUN rm -rf /var/cache/apk/*
+WORKDIR /app
+
+# Limita el uso de RAM con Java flags livianos
+ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
 
 COPY --from=build /app/target/*.jar app.jar
-COPY src/main/resources/scripts ./scripts
-
-ENV JAVA_TOOL_OPTIONS="-Xmx384m -Xms128m -XX:+UseG1GC"
 
 EXPOSE 8080
 
