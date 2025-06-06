@@ -25,11 +25,15 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 # Instalar psycopg2 (más fácil en Ubuntu)
 RUN pip3 install psycopg2-binary
 
-# Limita el uso de RAM con Java flags livianos
-ENV JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70"
+# Configuración de memoria más estable y debugging
+ENV JAVA_TOOL_OPTIONS="-Xmx512m -Xms256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof"
 
 COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
+
+# Healthcheck para detectar si la app está funcionando
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 CMD ["java", "-jar", "app.jar"]
