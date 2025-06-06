@@ -16,7 +16,7 @@ WORKDIR /app
 RUN apk update && apk add --no-cache python3 py3-pip
 
 # Opcional: agrega librerías si las usa tu script (psycopg2, pandas, etc.)
-RUN pip3 install psycopg2
+RUN pip3 install --no-cache-dir psycopg2-binary pandas
 
 # Copia el jar y scripts Python
 COPY --from=build /app/target/*.jar app.jar
