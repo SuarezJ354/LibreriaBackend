@@ -27,7 +27,7 @@ public class ExportController {
             }
 
             ProcessBuilder pb = new ProcessBuilder("python3",
-                    "src/main/resources/scripts/export_csv.py", tableName);
+                    "src/main/resources/scripts/Export_csv.py", tableName);
             pb.redirectErrorStream(true);
             Process process = pb.start();
             process.waitFor();
